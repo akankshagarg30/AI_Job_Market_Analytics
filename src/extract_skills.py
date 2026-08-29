@@ -1,4 +1,5 @@
 import csv
+import re
 from pathlib import Path
 
 from skill_dictionary import SKILLS
@@ -39,14 +40,17 @@ def extract_skills(text):
 
         for keyword in keywords:
 
-            if keyword in text:
+            keyword = keyword.strip().lower()
+
+            pattern = r"\b" + re.escape(keyword) + r"\b"
+
+            if re.search(pattern, text):
 
                 found_skills.append(skill)
 
                 break
 
     return found_skills
-
 
 # --------------------------------------------------
 # PROCESS JOBS

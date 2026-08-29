@@ -23,7 +23,10 @@ def health_check():
 
 
 @app.get("/jobs")
-def get_jobs():
+def get_jobs(
+    role: str | None = None,
+    location: str | None = None
+):
     connection = None
     cursor = None
 
@@ -31,11 +34,45 @@ def get_jobs():
         connection = get_connection()
         cursor = connection.cursor()
 
-        cursor.execute("""
-            SELECT *
-            FROM public.fact_jobs
+        query = """
+            SELECT
+                f.job_id,
+                f.title,
+                c.company_name,
+                l.location_name,
+                f.description,
+                f.contract_time,
+                f.job_url
+            FROM public.fact_jobs f
+            LEFT JOIN public.dim_company c
+                ON f.company_id = c.company_id
+            LEFT JOIN public.dim_location l
+                ON f.location_id = l.location_id
+            WHERE 1=1
+        """
+
+        params = []
+
+        # Role filter
+        if role and role.lower() != "all roles":
+            query += """
+                AND f.title ILIKE %s
+            """
+            params.append(f"%{role}%")
+
+        # Location filter
+        if location and location.lower() != "all locations":
+            query += """
+                AND l.location_name ILIKE %s
+            """
+            params.append(f"%{location}%")
+
+        query += """
+            ORDER BY f.created_at DESC
             LIMIT 100
-        """)
+        """
+
+        cursor.execute(query, params)
 
         rows = cursor.fetchall()
         columns = [description[0] for description in cursor.description]
