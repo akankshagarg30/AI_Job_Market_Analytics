@@ -1,4 +1,6 @@
-**# JobLens AI — AI-Powered Job Market Analytics Platform**
+&#x20;**JobLens AI — AI-Powered Job Market Analytics Platform**
+
+**---------------------------------------------------------------------------------**
 
 
 
@@ -10,11 +12,19 @@
 
 
 
-**## 🚀 Features**
 
 
 
-**- 🔎 \*\*Job Search\*\***
+
+**## 🚀 Features--**
+
+
+
+
+
+**- 🔎 Job Search**
+
+
 
 &#x20; **- Search jobs by role, location, and skills**
 
@@ -24,7 +34,9 @@
 
 
 
-**- 📄 \*\*Resume Analysis\*\***
+**- 📄 Resume Analysis**
+
+
 
 &#x20; **- Upload and analyze a resume**
 
@@ -36,7 +48,9 @@
 
 
 
-**- 🎯 \*\*Resume–Job Matching\*\***
+**- 🎯 Resume–Job Matching**
+
+
 
 &#x20; **- Calculate resume-to-job match scores**
 
@@ -46,7 +60,9 @@
 
 
 
-**- 📊 \*\*Job Market Analytics\*\***
+**- 📊 Job Market Analytics**
+
+
 
 &#x20; **- Analyze jobs by role**
 
@@ -60,7 +76,9 @@
 
 
 
-**- 🏠 \*\*Featured Jobs\*\***
+**- 🏠 Featured Jobs**
+
+
 
 &#x20; **- Display featured job opportunities on the home page**
 
@@ -68,7 +86,9 @@
 
 
 
-**- 🔐 \*\*Privacy \& Contact\*\***
+**- 🔐 Privacy \& Contact**
+
+
 
 &#x20; **- Dedicated privacy information section**
 
@@ -76,7 +96,15 @@
 
 
 
+
+
+
+
 **## 🛠️ Tech Stack**
+
+
+
+
 
 
 
@@ -96,6 +124,10 @@
 
 
 
+
+
+
+
 **### Analytics \& Visualization**
 
 
@@ -103,6 +135,10 @@
 **- Pandas**
 
 **- Power BI**
+
+
+
+
 
 
 
@@ -122,6 +158,10 @@
 
 
 
+
+
+
+
 **### Frontend**
 
 
@@ -129,6 +169,10 @@
 **- Streamlit**
 
 **- HTML/CSS customization**
+
+
+
+
 
 
 
@@ -146,11 +190,17 @@
 
 
 
+
+
+
+
+
+
 **## 🏗️ Project Architecture**
 
 
 
-**```text**
+
 
 **JobLens AI**
 
@@ -200,7 +250,21 @@
 
 &#x20;       **└── Job Market Analytics**
 
+
+
+
+
+**-------------------------------------------------------------------------------------------------------**
+
+
+
 **📁 Project Structure**
+
+
+
+
+
+
 
 **AI\_Job\_Market\_Analytics/**
 
@@ -286,7 +350,21 @@
 
 **└── requirements.txt**
 
+
+
+
+
+**----------------------------------------------------------------------------------------------------------------**
+
+
+
 **🔄 Data Pipeline**
+
+
+
+
+
+
 
 **Job API**
 
@@ -318,7 +396,23 @@
 
 **Power BI Dashboard**
 
+
+
+
+
+
+
+**------------------------------------------------------------------------------------------------------------------**
+
+
+
 **🧠 AI / NLP Workflow**
+
+
+
+
+
+
 
 **Resume**
 
