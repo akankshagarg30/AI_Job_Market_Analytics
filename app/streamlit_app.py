@@ -24,7 +24,13 @@ from src.analytics import (
     get_match_score_distribution,
 )
 
+import os
 
+logo_path = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)),
+    "assets",
+    "joblens_logo.png"
+)
 # ============================================================
 # PROJECT PATH
 # ============================================================
@@ -48,8 +54,8 @@ from src.resume_extractor import extract_resume_information
 # ============================================================
 
 st.set_page_config(
-    page_title="AI Job Market Analytics",
-    page_icon="📊",
+    page_title="JobLens AI",
+    page_icon=logo_path,
     layout="wide"
 )
 
@@ -59,41 +65,6 @@ st.set_page_config(
 # ============================================================
 
 API_URL = "http://127.0.0.1:8000"
-
-
-
-
-# ============================================================
-# APP HEADER
-# ============================================================
-
-st.markdown(
-    """
-    <div style="
-        width: 100%;
-        padding: 18px 24px;
-        margin-bottom: 24px;
-        border-bottom: 1px solid rgba(128, 128, 128, 0.25);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        box-sizing: border-box;
-    ">
-        <div>
-            <div style="font-size: 22px; font-weight: 700;">
-                📊 AI Job Market Analytics
-            </div>
-            <div style="font-size: 13px; opacity: 0.65; margin-top: 3px;">
-                Search jobs • Analyze resumes • Explore market insights
-            </div>
-        </div>
-        <div style="font-size: 13px; opacity: 0.65;">
-            Career Intelligence Platform
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
 
 
 # ============================================================
@@ -219,46 +190,32 @@ if "resume_filter_sort" not in st.session_state:
 
 with st.sidebar:
 
-    st.markdown("")
 
     # App title
-    st.markdown(
-        """
-        <div style="text-align: center; font-size: 55px;">
-            📊
-        </div>
-        """,
-        unsafe_allow_html=True
+    st.markdown("")
+
+    # App logo
+    logo_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "assets",
+        "joblens_logo.png"
     )
 
-    st.markdown(
-        """
-        <div style="
-            text-align: center;
-            font-size: 38px;
-            font-weight: 700;
-            line-height: 1.05;
-            margin-bottom: 35px;
-        ">
-            Job<br>Analytics
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.image(logo_path, use_container_width=True)
+
+    
 
     # Navigation
-    st.markdown("### Navigation")
+    #st.markdown("### Navigation")
 
     page_options = [
-        "🔴  Job Search",
-        "○  Resume Analysis",
-        "📊  Analytics"
+        "Job Search",
+        "Resume Analysis"
     ]
 
     page_map = {
-        "🔴  Job Search": "Job Search",
-        "○  Resume Analysis": "Resume Analysis",
-        "📊  Analytics": "Analytics"
+        "Job Search": "Job Search",
+        "Resume Analysis": "Resume Analysis"
     }
 
     current_page_label = next(
@@ -279,7 +236,9 @@ with st.sidebar:
 
     selected_page = page_map[page]
 
-    if st.session_state.page != selected_page:
+    # Analytics is opened from the Job Search page, not from the sidebar.
+    # Do not let the sidebar radio overwrite the Analytics page on rerun.
+    if st.session_state.page != "Analytics" and st.session_state.page != selected_page:
         st.session_state.page = selected_page
 
         if selected_page == "Job Search":
@@ -300,11 +259,10 @@ if st.session_state.page == "Job Search":
     # HEADER
     # --------------------------------------------------------
 
-    st.title("🔎 Job Search")
+    st.title("Find Your Dream Job")
 
     st.markdown(
-        "Find jobs based on your preferred role, location, "
-        "experience and salary."
+        "Find jobs based on your preferred role, location and skills."
     )
 
     st.divider()
@@ -314,46 +272,34 @@ if st.session_state.page == "Job Search":
     # JOB SEARCH FILTERS
     # --------------------------------------------------------
 
-    st.subheader("Job Search")
+    #st.subheader("Job Search")
 
     col1, col2 = st.columns(2)
 
 
     # --------------------------------------------------------
-    # LEFT COLUMN
+    # JOB ROLE
     # --------------------------------------------------------
 
     with col1:
 
         job_role = st.selectbox(
-            "Job Role",
+            "Job Role :red[*]",
             JOB_ROLES,
             key="job_role"
         )
 
-        location = st.selectbox(
-            "Location",
-            LOCATIONS,
-            key="job_location"
-        )
-
 
     # --------------------------------------------------------
-    # RIGHT COLUMN
+    # LOCATION
     # --------------------------------------------------------
 
     with col2:
 
-        experience = st.selectbox(
-            "Experience",
-            EXPERIENCE_OPTIONS,
-            key="job_experience"
-        )
-
-        salary = st.selectbox(
-            "Salary",
-            SALARY_OPTIONS,
-            key="job_salary"
+        location = st.selectbox(
+            "Location :red[*]",
+            LOCATIONS,
+            key="job_location"
         )
 
 
@@ -364,7 +310,7 @@ if st.session_state.page == "Job Search":
     st.markdown("### Skills")
 
     candidate_skills = st.multiselect(
-        "Select your skills",
+        "Select your skills :red[*]",
         SKILLS,
         placeholder="Select skills",
         key="candidate_skills"
@@ -405,8 +351,8 @@ if st.session_state.page == "Job Search":
                         "skills": candidate_skills,
                         "role": job_role,
                         "location": location,
-                        "experience": experience,
-                        "salary": salary
+                        "experience": "Any Experience",
+                        "salary": "Any Salary"
                     },
                     timeout=30
                 )
@@ -503,14 +449,24 @@ if st.session_state.page == "Job Search":
 
 
         # ----------------------------------------------------
-        # RECOMMENDED JOBS
+        # RECOMMENDED JOBS + ANALYTICS BUTTON
         # ----------------------------------------------------
 
-        st.markdown("## Recommended Jobs")
+        heading_col, analytics_col = st.columns([5, 1])
 
-        st.caption(
-            "Top jobs ranked by your skill match."
-        )
+        with heading_col:
+            st.markdown("## Recommended Jobs")
+            st.caption(
+                "Top jobs ranked by your skill match."
+            )
+
+        with analytics_col:
+            if st.button(
+                "View Analytics",
+                use_container_width=True
+            ):
+                st.session_state.page = "Analytics"
+                st.rerun()
 
 
         # ----------------------------------------------------
@@ -594,7 +550,7 @@ if st.session_state.page == "Job Search":
         # ----------------------------------------------------
 
         st.markdown(
-            "## 🔎 Explore All Matching Jobs"
+            "## Explore All Matching Jobs"
         )
 
         st.write(
@@ -610,7 +566,7 @@ if st.session_state.page == "Job Search":
         if not st.session_state.show_all_jobs:
 
             if st.button(
-                "VIEW ALL MATCHING JOBS"
+                "VIEW ALL"
             ):
 
                 st.session_state.show_all_jobs = True
@@ -638,7 +594,7 @@ if st.session_state.page == "Job Search":
 
 
             if st.button(
-                "← BACK TO RECOMMENDED JOBS"
+                "← Close"
             ):
 
                 st.session_state.show_all_jobs = False
@@ -1036,7 +992,11 @@ elif st.session_state.page == "Resume Analysis":
 
 elif st.session_state.page == "Analytics":
 
-    st.title("📊 Job Market Analytics")
+    if st.button("← Back"):
+        st.session_state.page = "Job Search"
+        st.rerun()
+
+    st.title("Job Market Analytics")
 
     st.markdown(
         "Explore insights from the jobs returned by your "
@@ -1070,17 +1030,25 @@ elif st.session_state.page == "Analytics":
 
     else:
 
-        # ----------------------------------------------------
+         # ----------------------------------------------------
         # ANALYTICS CALCULATIONS
         # ----------------------------------------------------
 
-        total_jobs = get_total_jobs(analytics_jobs)
+        total_jobs = get_total_jobs(
+            analytics_jobs
+        )
 
-        average_match = get_average_match_score(analytics_jobs)
+        average_match = get_average_match_score(
+            analytics_jobs
+        )
 
-        locations = get_jobs_by_location(analytics_jobs)
+        locations = get_jobs_by_location(
+            analytics_jobs
+        )
 
-        roles = get_jobs_by_role(analytics_jobs)
+        roles = get_jobs_by_role(
+            analytics_jobs
+        )
 
         top_skills = get_top_skills(
             analytics_jobs,
@@ -1100,18 +1068,21 @@ elif st.session_state.page == "Analytics":
         col1, col2, col3 = st.columns(3)
 
         with col1:
+
             st.metric(
                 "Total Jobs",
                 total_jobs
             )
 
         with col2:
+
             st.metric(
                 "Average Match Score",
                 f"{average_match:.0f}%"
             )
 
         with col3:
+
             st.metric(
                 "Locations",
                 len(locations)
@@ -1120,56 +1091,93 @@ elif st.session_state.page == "Analytics":
         st.markdown("")
 
         # ----------------------------------------------------
-        # JOBS BY ROLE + LOCATION
+        # JOBS BY ROLE + LOCATION — CARD UI
         # ----------------------------------------------------
 
         col1, col2 = st.columns(2)
 
         with col1:
-            st.subheader("💼 Jobs by Role")
 
-            if roles:
-                st.bar_chart(roles)
-            else:
-                st.info("No role data available.")
+            with st.container(border=True):
+
+                st.subheader("Jobs by Role")
+
+                if roles:
+
+                    st.bar_chart(
+                        roles
+                    )
+
+                else:
+
+                    st.info(
+                        "No role data available."
+                    )
 
         with col2:
-            st.subheader("📍 Jobs by Location")
 
-            if locations:
-                st.bar_chart(locations)
+            with st.container(border=True):
+
+                st.subheader("Jobs by Location")
+
+                if locations:
+
+                    st.bar_chart(
+                        locations
+                    )
+
+                else:
+
+                    st.info(
+                        "No location data available."
+                    )
+
+        st.markdown("")
+
+        # ----------------------------------------------------
+        # TOP SKILLS — CARD UI
+        # ----------------------------------------------------
+
+        with st.container(border=True):
+
+            st.subheader(
+                "Most Demanded Skills"
+            )
+
+            if top_skills:
+
+                skill_data = {
+                    skill.title(): count
+                    for skill, count in top_skills
+                }
+
+                st.bar_chart(
+                    skill_data
+                )
+
             else:
-                st.info("No location data available.")
 
-        st.divider()
+                st.info(
+                    "Skill data is not available for these jobs."
+                )
 
-        # ----------------------------------------------------
-        # TOP SKILLS
-        # ----------------------------------------------------
-
-        st.subheader("🔥 Most Demanded Skills")
-
-        if top_skills:
-            skill_data = {
-                skill.title(): count
-                for skill, count in top_skills
-            }
-
-            st.bar_chart(skill_data)
-        else:
-            st.info("Skill data is not available for these jobs.")
-
-        st.divider()
+        st.markdown("")
 
         # ----------------------------------------------------
-        # MATCH SCORE DISTRIBUTION
+        # MATCH SCORE DISTRIBUTION — CARD UI
         # ----------------------------------------------------
 
-        st.subheader("🎯 Resume Match Score Distribution")
+        with st.container(border=True):
 
-        st.bar_chart(match_distribution)
+            st.subheader(
+                "Resume Match Score Distribution"
+            )
 
-        st.divider()
+            st.bar_chart(
+                match_distribution
+            )
+
+        st.markdown("")
 
         # ----------------------------------------------------
         # ANALYTICS NOTE
@@ -1180,6 +1188,7 @@ elif st.session_state.page == "Analytics":
             "by your current search. Jobs without skill data "
             "are excluded from match-score calculations."
         )
+
 
 # ============================================================
 # APP FOOTER
@@ -1195,14 +1204,8 @@ st.markdown(
         opacity: 0.65;
         font-size: 13px;
     ">
-        <div style="font-weight: 600; margin-bottom: 5px;">
-            📊 AI Job Market Analytics
-        </div>
-        <div>
-            AI-Powered Job Market Analytics Platform &nbsp;•&nbsp; Built for smarter career decisions
-        </div>
+        All rights reserved © 2026 JobLens AI.
     </div>
     """,
     unsafe_allow_html=True
 )
-
