@@ -93,7 +93,32 @@ def get_job_url(job_id: str | None) -> str | None:
 
     return None
 
+# ============================================================
+# GET FEATURED JOBS
+# ============================================================
 
+def get_featured_jobs():
+    """
+    Get the latest 10 jobs from all roles and locations.
+    The API already sorts jobs by created_at DESC.
+    """
+
+    try:
+        response = requests.get(
+            f"{API_URL}/jobs",
+            timeout=15
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+
+            # API returns jobs already ordered by newest first
+            return data.get("jobs", [])[:10]
+
+    except requests.RequestException:
+        pass
+
+    return []
 # ============================================================
 # CONSTANTS
 # ============================================================
@@ -160,7 +185,7 @@ SKILLS = [
 # ============================================================
 
 if "page" not in st.session_state:
-    st.session_state.page = "Job Search"
+    st.session_state.page = "Home"
 
 if "search_data" not in st.session_state:
     st.session_state.search_data = None
@@ -200,6 +225,35 @@ with st.sidebar:
         "assets",
         "joblens_logo.png"
     )
+    st.markdown(
+    """
+    <style>
+
+    /* Remove extra space around the sidebar logo */
+    section[data-testid="stSidebar"] [data-testid="stImage"] {
+        margin-top: -40px !important;
+        margin-bottom: -35px !important;
+        padding: 0 !important;
+    }
+
+    /* Logo size */
+    section[data-testid="stSidebar"] [data-testid="stImage"] img {
+        width: 150px !important;
+        height: auto !important;
+        display: block !important;
+        margin: 0 auto !important;
+    }
+
+    /* Reduce space before navigation */
+    section[data-testid="stSidebar"] .stRadio {
+        margin-top: 0px !important;
+        padding-top: 0px !important;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
     st.image(logo_path, use_container_width=True)
 
@@ -209,20 +263,103 @@ with st.sidebar:
     #st.markdown("### Navigation")
 
     page_options = [
-        "Job Search",
-        "Resume Analysis"
+        "Home",
+        "Find Job",
+        "Analyze Resume",
+        "Privacy",
+        "Contact Us"
     ]
 
     page_map = {
-        "Job Search": "Job Search",
-        "Resume Analysis": "Resume Analysis"
+        "Home": "Home",
+        "Find Job": "Job Search",
+        "Analyze Resume": "Resume Analysis",
+        "Privacy": "Privacy",
+        "Contact Us": "Contact Us"
     }
 
     current_page_label = next(
         (label for label, value in page_map.items()
          if value == st.session_state.page),
-        page_options[0]
+        "Home"
     )
+    
+    # ============================================================
+# PROFESSIONAL SIDEBAR NAVIGATION STYLE
+# ============================================================
+
+    st.markdown(
+    """
+    <style>
+
+    /* Navigation spacing */
+    section[data-testid="stSidebar"] .stRadio > div {
+        gap: 6px;
+    }
+
+    /* Completely remove radio buttons / circles */
+    section[data-testid="stSidebar"] .stRadio [data-baseweb="radio"] {
+        display: none !important;
+    }
+
+    section[data-testid="stSidebar"] .stRadio input[type="radio"] {
+        display: none !important;
+    }
+
+    /* Navigation cards */
+    section[data-testid="stSidebar"] .stRadio label {
+        display: flex !important;
+        align-items: center !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+
+        background-color: transparent !important;
+        border: 1px solid transparent !important;
+        border-radius: 10px !important;
+
+        padding: 11px 16px !important;
+        margin: 4px 0 !important;
+
+        cursor: pointer !important;
+        transition: background-color 0.2s ease !important;
+    }
+
+    /* Navigation text */
+    section[data-testid="stSidebar"] .stRadio label p {
+        margin: 0 !important;
+        padding: 0 !important;
+
+        font-size: 16px !important;
+        font-weight: 500 !important;
+
+        color: #D1D5DB !important;
+    }
+
+    /* Hover effect */
+    section[data-testid="stSidebar"] .stRadio label:hover {
+        background-color: #30323B !important;
+    }
+
+    section[data-testid="stSidebar"] .stRadio label:hover p {
+        color: #FFFFFF !important;
+    }
+
+    /* Selected navigation card */
+    section[data-testid="stSidebar"] .stRadio label:has(input:checked) {
+        background-color: #30323B !important;
+        border-color: #3A3D47 !important;
+    }
+
+    /* Selected navigation text */
+    section[data-testid="stSidebar"] .stRadio label:has(input:checked) p {
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
     # Keep the radio widget and the actual page state synchronized.
     # No st.rerun() is needed for sidebar navigation.
@@ -233,22 +370,171 @@ with st.sidebar:
         key="main_navigation",
         label_visibility="collapsed"
     )
-
+    
     selected_page = page_map[page]
 
-    # Analytics is opened from the Job Search page, not from the sidebar.
-    # Do not let the sidebar radio overwrite the Analytics page on rerun.
+        # Analytics is opened from the Job Search page, not from the sidebar.
+        # Do not let the sidebar radio overwrite the Analytics page on rerun.
     if st.session_state.page != "Analytics" and st.session_state.page != selected_page:
-        st.session_state.page = selected_page
+            st.session_state.page = selected_page
 
-        if selected_page == "Job Search":
-            st.session_state.show_all_jobs = False
+            if selected_page == "Job Search":
+                st.session_state.show_all_jobs = False
 
     st.divider()
 
     st.caption(
         "AI-Powered Job Market Analytics Platform"
     )
+    
+# ============================================================
+# HOME PAGE
+# ============================================================
+
+if st.session_state.page == "Home":
+
+    # --------------------------------------------------------
+    # WELCOME SECTION
+    # --------------------------------------------------------
+
+    st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap');
+
+    .joblens-name {
+        font-family: 'Poppins', sans-serif;
+        font-weight: 700;
+        color: #5A5D66;
+    }
+
+    .joblens-ai {
+        font-family: 'Poppins', sans-serif;
+        font-weight: 700;
+        color: #168FE5;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+    st.markdown(
+        """
+        <h1>
+            Welcome to
+            <span class="joblens-name">JobLens</span>
+            <span class="joblens-ai">AI</span>
+        </h1>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        Your intelligent companion for navigating the modern job market.
+
+        JobLens AI helps you discover relevant opportunities, understand
+        how well your skills match available jobs, and identify skills
+        that can strengthen your career profile.
+        """
+    )
+
+    st.markdown("")
+
+    # --------------------------------------------------------
+    # QUICK INTRO
+    # --------------------------------------------------------
+
+    with st.container(border=True):
+
+        st.subheader("Find Better Opportunities")
+
+        st.write(
+            "Search for jobs based on your preferred role, location "
+            "and skills. JobLens AI analyzes available opportunities "
+            "and highlights jobs that best match your profile."
+        )
+
+    st.markdown("")
+
+    # --------------------------------------------------------
+    # FEATURED JOBS
+    # --------------------------------------------------------
+
+    st.markdown("## Featured Jobs")
+
+    st.caption(
+        "Latest 10 job opportunities across all roles and locations."
+    )
+
+    featured_jobs = get_featured_jobs()
+
+    if not featured_jobs:
+
+        st.info(
+            "No featured jobs are available at the moment."
+        )
+
+    else:
+
+        # Display jobs in groups of 2
+        for start in range(0, len(featured_jobs), 2):
+
+            job_pair = featured_jobs[start:start + 2]
+
+            cols = st.columns(2)
+
+            for col, job in zip(cols, job_pair):
+
+                with col:
+
+                    with st.container(border=True):
+
+                        st.markdown(
+                            f"### {job.get('title', 'Unknown Role')}"
+                        )
+
+                        st.write(
+                            f"**Company:** "
+                            f"{job.get('company_name', job.get('company', 'Unknown'))}"
+                        )
+
+                        st.write(
+                            f"**Location:** "
+                            f"{job.get('location_name', job.get('location', 'Unknown'))}"
+                        )
+
+                        if job.get("contract_time"):
+                            st.write(
+                                f"**Employment:** "
+                                f"{job.get('contract_time')}"
+                            )
+
+                        st.markdown("")
+
+                        job_url = get_job_url(
+                            job.get("job_id")
+                        )
+
+                        if not job_url:
+                            job_url = job.get("job_url")
+
+                        if job_url:
+
+                            st.link_button(
+                                "Apply Now",
+                                job_url,
+                                type="primary",
+                                use_container_width=True
+                            )
+
+                        else:
+
+                            st.caption(
+                                "Application link unavailable"
+                            )
+
+            st.markdown("")
 # ============================================================
 # JOB SEARCH PAGE
 # ============================================================
@@ -259,7 +545,28 @@ if st.session_state.page == "Job Search":
     # HEADER
     # --------------------------------------------------------
 
-    st.title("Find Your Dream Job")
+    header_col1, header_col2 = st.columns([5, 1])
+
+    with header_col1:
+        st.title("Find Your Dream Job")
+
+    with header_col2:
+        if st.button(
+            "Refresh",
+            key="refresh_job_search",
+            use_container_width=True
+        ):
+            # Remember the page currently being viewed
+            current_page = st.session_state.get("page", "Job Search")
+
+            # Clear all search/results/form data
+            st.session_state.clear()
+
+            # Keep the user on the same page
+            st.session_state.page = current_page
+
+            # Reload the application
+            st.rerun()
 
     st.markdown(
         "Find jobs based on your preferred role, location and skills."
@@ -686,7 +993,7 @@ if st.session_state.page == "Job Search":
 
 elif st.session_state.page == "Resume Analysis":
 
-    st.title("Resume Analysis")
+    st.title("Lets Analyze Your Resume")
 
     st.markdown(
         "Upload your resume to discover jobs that best match your skills."
@@ -1189,7 +1496,158 @@ elif st.session_state.page == "Analytics":
             "are excluded from match-score calculations."
         )
 
+# ============================================================
+# PRIVACY POLICY PAGE
+# ============================================================
 
+if st.session_state.page == "Privacy":
+
+    st.title("Privacy Policy")
+
+    st.markdown(
+        """
+        **Last Updated: August 31, 2026**
+
+        Welcome to **JobLens AI**, an AI-powered job market analytics
+        platform. Your privacy is important to us. This Privacy Policy
+        explains how information is handled when you use our platform.
+
+        ### 1. Information We Collect
+
+        Depending on the features you use, JobLens AI may process:
+
+        - Job search preferences such as role, location, and skills.
+        - Resume files or resume information submitted for analysis.
+        - Information required to generate job market insights and
+          recommendations.
+        - Basic technical information required for the application to
+          function properly.
+
+        We only use information that is necessary to provide and improve
+        the features of the platform.
+
+        ### 2. How We Use Your Information
+
+        Information provided to JobLens AI may be used to:
+
+        - Provide job search and job market analytics.
+        - Analyze resumes and provide relevant insights.
+        - Generate job recommendations and career-related insights.
+        - Improve application functionality and user experience.
+        - Maintain the security and reliability of the platform.
+
+        ### 3. Resume Privacy
+
+        If you upload a resume for analysis, the contents of the resume
+        may be processed to generate the requested analysis.
+
+        Users should avoid uploading sensitive personal information that
+        is not necessary for resume analysis.
+
+        ### 4. Data Security
+
+        We take reasonable measures to protect information processed
+        through JobLens AI against unauthorized access, alteration,
+        disclosure, or destruction.
+
+        However, no internet-based application can guarantee absolute
+        security of information.
+
+        ### 5. Third-Party Services
+
+        JobLens AI may use third-party services, APIs, cloud services,
+        or data providers to provide certain application functionality.
+
+        Information processed by such services may be subject to their
+        respective privacy policies and terms of service.
+
+        ### 6. Data Retention
+
+        Information should only be retained for as long as reasonably
+        necessary to provide the requested functionality, maintain the
+        application, comply with applicable requirements, or resolve
+        disputes.
+
+        ### 7. Your Responsibility
+
+        You are responsible for ensuring that the information you provide
+        to JobLens AI is accurate and that you have the necessary rights
+        to submit any documents or information you upload.
+
+        ### 8. Children's Privacy
+
+        JobLens AI is not intended to knowingly collect personal
+        information from children.
+
+        ### 9. Changes to This Privacy Policy
+
+        This Privacy Policy may be updated from time to time to reflect
+        changes in the application, technology, or applicable requirements.
+
+        Any updated version will be made available through the platform.
+
+        ### 10. Contact Us
+
+        If you have questions, concerns, or requests regarding this
+        Privacy Policy or the handling of information, please contact
+        the JobLens AI project team through the appropriate project
+        contact channel.
+
+        ---
+
+        **JobLens AI**  
+        *AI-Powered Job Market Analytics Platform*
+        """
+    )
+    
+# ============================================================
+# CONTACT US PAGE
+# ============================================================
+
+if st.session_state.page == "Contact Us":
+
+    st.title("Contact Us")
+
+    st.markdown(
+        "We’re here to help you make the most of JobLens AI. "
+        "If you have any questions, feedback, suggestions, or need assistance, "
+        "feel free to get in touch with our team."
+    )
+
+    st.divider()
+
+    st.subheader("Get in Touch")
+
+    st.markdown(
+        """
+        **Have a question or feedback?**
+
+        We value your feedback and are always looking for ways to improve
+        JobLens AI. Whether you have encountered an issue, have a suggestion
+        for a new feature, or simply want to learn more about the platform,
+        we'd be happy to hear from you.
+
+        **Email:** support@joblensai.com
+
+        **Response Time:**  
+        Our team aims to respond to all queries within 2–3 business days.
+        """
+    )
+
+    st.info(
+        "For technical issues, please include a brief description of the "
+        "problem and any relevant details so we can assist you more effectively."
+    )
+
+    st.markdown(
+        """
+        ### Thank You
+
+        Thank you for using **JobLens AI**. Your feedback helps us build a
+        smarter and more useful job-market analytics platform.
+        """
+    )
+    
 # ============================================================
 # APP FOOTER
 # ============================================================
