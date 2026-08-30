@@ -1,10 +1,51 @@
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+import tempfile
+
 import requests
 import streamlit as st
+from src.resume_matching import(
+    calculate_match_summary,
+    get_top_missing_skills
+)
+
+from src.analytics import (
+    get_total_jobs,
+    get_average_match_score,
+    get_jobs_by_location,
+    get_jobs_by_role,
+    get_top_skills,
+    get_match_score_distribution,
+)
 
 
-# ==================================================
+# ============================================================
+# PROJECT PATH
+# ============================================================
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+
+# ============================================================
+# RESUME MODULES
+# ============================================================
+
+from src.resume_parser import extract_text_from_pdf
+from src.resume_extractor import extract_resume_information
+
+
+# ============================================================
 # PAGE CONFIGURATION
-# ==================================================
+# ============================================================
 
 st.set_page_config(
     page_title="AI Job Market Analytics",
@@ -13,517 +54,1155 @@ st.set_page_config(
 )
 
 
-# ==================================================
+# ============================================================
 # API CONFIGURATION
-# ==================================================
+# ============================================================
 
 API_URL = "http://127.0.0.1:8000"
 
 
-# ==================================================
-# SESSION STATE
-# ==================================================
-
-if "search_data" not in st.session_state:
-
-    st.session_state.search_data = None
 
 
-if "show_all_jobs" not in st.session_state:
-
-    st.session_state.show_all_jobs = False
-
-
-# ==================================================
-# PAGE HEADER
-# ==================================================
-
-st.title("AI Job Market Analytics")
+# ============================================================
+# APP HEADER
+# ============================================================
 
 st.markdown(
-    "Find and explore jobs based on your preferences."
-)
-
-st.divider()
-
-
-# ==================================================
-# JOB SEARCH FILTERS
-# ==================================================
-
-st.subheader("Job Search")
-
-col1, col2 = st.columns(2)
-
-
-with col1:
-
-    job_role = st.selectbox(
-        "Job Role",
-        [
-            "Select a job role",
-            "Data Analyst",
-            "Data Scientist",
-            "Data Engineer",
-            "Business Analyst"
-        ]
-    )
-
-    location = st.selectbox(
-        "Location",
-        [
-            "All Locations",
-            "Bangalore",
-            "Pune",
-            "Mumbai",
-            "Delhi",
-            "Hyderabad"
-        ]
-    )
-
-
-with col2:
-
-    experience = st.selectbox(
-        "Experience",
-        [
-            "Any Experience",
-            "0–3 Years",
-            "3–5 Years",
-            "5+ Years"
-        ]
-    )
-
-    salary = st.selectbox(
-        "Salary",
-        [
-            "Any Salary",
-            "₹5L+",
-            "₹8L+",
-            "₹10L+"
-        ]
-    )
-
-
-# ==================================================
-# CANDIDATE SKILLS
-# ==================================================
-
-st.divider()
-
-st.subheader("Your Skills")
-
-
-candidate_skills = st.multiselect(
-    "Select your skills",
-    [
-        "SQL",
-        "Python",
-        "Power BI",
-        "Excel",
-        "Tableau",
-        "R",
-        "AWS",
-        "Azure",
-        "Google Cloud",
-        "Snowflake",
-        "Databricks",
-        "Apache Spark",
-        "Machine Learning",
-        "Deep Learning",
-        "NLP",
-        "Statistics",
-        "ETL",
-        "Data Visualization",
-        "Git",
-        "Java",
-        "C++",
-        "JavaScript"
-    ]
+    """
+    <div style="
+        width: 100%;
+        padding: 18px 24px;
+        margin-bottom: 24px;
+        border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-sizing: border-box;
+    ">
+        <div>
+            <div style="font-size: 22px; font-weight: 700;">
+                📊 AI Job Market Analytics
+            </div>
+            <div style="font-size: 13px; opacity: 0.65; margin-top: 3px;">
+                Search jobs • Analyze resumes • Explore market insights
+            </div>
+        </div>
+        <div style="font-size: 13px; opacity: 0.65;">
+            Career Intelligence Platform
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
 
-# ==================================================
-# SEARCH BUTTON
-# ==================================================
+# ============================================================
+# JOB URL HELPER
+# ============================================================
 
-st.divider()
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_job_url(job_id: str | None) -> str | None:
+    """Get the application URL for a job without changing the API."""
 
+    if not job_id:
+        return None
 
-if st.button(
-    "SEARCH JOBS",
-    type="primary"
-):
-
-    # --------------------------------------------------
-    # CHECK SKILLS
-    # --------------------------------------------------
-
-    if job_role == "Select a job role":
-
-        st.warning(
-            "Please select a job role."
+    try:
+        response = requests.get(
+            f"{API_URL}/jobs/{job_id}",
+            timeout=10
         )
-    elif not candidate_skills:
-        st.warning("Please select at least one skill.")
 
-    else:
+        if response.status_code == 200:
+            job_details = response.json()
+            return job_details.get("job_url")
 
-        try:
+    except requests.RequestException:
+        pass
 
-            # --------------------------------------------------
-            # CALL FASTAPI
-            # --------------------------------------------------
+    return None
 
-            response = requests.post(
 
-                f"{API_URL}/match",
+# ============================================================
+# CONSTANTS
+# ============================================================
 
-                json={
+JOB_ROLES = [
+    "Select a role",
+    "Data Analyst",
+    "Data Scientist",
+    "Data Engineer",
+    "Business Analyst"
+]
 
-                    "skills": candidate_skills,
+LOCATIONS = [
+    "All Locations",
+    "Bangalore",
+    "Pune",
+    "Mumbai",
+    "Delhi",
+    "Hyderabad"
+]
 
-                    "role": job_role,
+EXPERIENCE_OPTIONS = [
+    "Any Experience",
+    "0–3 Years",
+    "3–5 Years",
+    "5+ Years"
+]
 
-                    "location": location,
+SALARY_OPTIONS = [
+    "Any Salary",
+    "₹5L+",
+    "₹8L+",
+    "₹10L+"
+]
 
-                    "experience": experience,
+SKILLS = [
+    "SQL",
+    "Python",
+    "Power BI",
+    "Excel",
+    "Tableau",
+    "R",
+    "AWS",
+    "Azure",
+    "Google Cloud",
+    "Snowflake",
+    "Databricks",
+    "Apache Spark",
+    "Machine Learning",
+    "Deep Learning",
+    "NLP",
+    "Statistics",
+    "ETL",
+    "Data Visualization",
+    "Git",
+    "Java",
+    "C++",
+    "JavaScript"
+]
 
-                    "salary": salary
-                },
 
-                timeout=30
+# ============================================================
+# SESSION STATE
+# ============================================================
+
+if "page" not in st.session_state:
+    st.session_state.page = "Job Search"
+
+if "search_data" not in st.session_state:
+    st.session_state.search_data = None
+
+if "show_all_jobs" not in st.session_state:
+    st.session_state.show_all_jobs = False
+
+if "resume_data" not in st.session_state:
+    st.session_state.resume_data = None
+
+if "resume_jobs" not in st.session_state:
+    st.session_state.resume_jobs = None
+
+if "resume_filter_min_score" not in st.session_state:
+    st.session_state.resume_filter_min_score = "50%+"
+
+if "resume_filter_location" not in st.session_state:
+    st.session_state.resume_filter_location = "All Locations"
+
+if "resume_filter_sort" not in st.session_state:
+    st.session_state.resume_filter_sort = "Match Score ↓"
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
+with st.sidebar:
+
+    st.markdown("")
+
+    # App title
+    st.markdown(
+        """
+        <div style="text-align: center; font-size: 55px;">
+            📊
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        <div style="
+            text-align: center;
+            font-size: 38px;
+            font-weight: 700;
+            line-height: 1.05;
+            margin-bottom: 35px;
+        ">
+            Job<br>Analytics
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Navigation
+    st.markdown("### Navigation")
+
+    page_options = [
+        "🔴  Job Search",
+        "○  Resume Analysis",
+        "📊  Analytics"
+    ]
+
+    page_map = {
+        "🔴  Job Search": "Job Search",
+        "○  Resume Analysis": "Resume Analysis",
+        "📊  Analytics": "Analytics"
+    }
+
+    current_page_label = next(
+        (label for label, value in page_map.items()
+         if value == st.session_state.page),
+        page_options[0]
+    )
+
+    # Keep the radio widget and the actual page state synchronized.
+    # No st.rerun() is needed for sidebar navigation.
+    page = st.radio(
+        "",
+        page_options,
+        index=page_options.index(current_page_label),
+        key="main_navigation",
+        label_visibility="collapsed"
+    )
+
+    selected_page = page_map[page]
+
+    if st.session_state.page != selected_page:
+        st.session_state.page = selected_page
+
+        if selected_page == "Job Search":
+            st.session_state.show_all_jobs = False
+
+    st.divider()
+
+    st.caption(
+        "AI-Powered Job Market Analytics Platform"
+    )
+# ============================================================
+# JOB SEARCH PAGE
+# ============================================================
+
+if st.session_state.page == "Job Search":
+
+    # --------------------------------------------------------
+    # HEADER
+    # --------------------------------------------------------
+
+    st.title("🔎 Job Search")
+
+    st.markdown(
+        "Find jobs based on your preferred role, location, "
+        "experience and salary."
+    )
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # JOB SEARCH FILTERS
+    # --------------------------------------------------------
+
+    st.subheader("Job Search")
+
+    col1, col2 = st.columns(2)
+
+
+    # --------------------------------------------------------
+    # LEFT COLUMN
+    # --------------------------------------------------------
+
+    with col1:
+
+        job_role = st.selectbox(
+            "Job Role",
+            JOB_ROLES,
+            key="job_role"
+        )
+
+        location = st.selectbox(
+            "Location",
+            LOCATIONS,
+            key="job_location"
+        )
+
+
+    # --------------------------------------------------------
+    # RIGHT COLUMN
+    # --------------------------------------------------------
+
+    with col2:
+
+        experience = st.selectbox(
+            "Experience",
+            EXPERIENCE_OPTIONS,
+            key="job_experience"
+        )
+
+        salary = st.selectbox(
+            "Salary",
+            SALARY_OPTIONS,
+            key="job_salary"
+        )
+
+
+    # --------------------------------------------------------
+    # SKILLS
+    # --------------------------------------------------------
+
+    st.markdown("### Skills")
+
+    candidate_skills = st.multiselect(
+        "Select your skills",
+        SKILLS,
+        placeholder="Select skills",
+        key="candidate_skills"
+    )
+
+
+    # --------------------------------------------------------
+    # SEARCH BUTTON
+    # --------------------------------------------------------
+
+    st.markdown("")
+
+    if st.button(
+        "SEARCH JOBS",
+        type="primary",
+        use_container_width=False
+    ):
+
+        if job_role == "Select a role":
+
+            st.warning(
+                "Please select a job role."
             )
 
-            # --------------------------------------------------
-            # SUCCESS
-            # --------------------------------------------------
+        elif not candidate_skills:
 
-            if response.status_code == 200:
+            st.warning(
+                "Please select at least one skill."
+            )
 
-                data = response.json()
+        else:
 
-                # Save results so Streamlit reruns
-                # do not lose them.
+            try:
 
-                st.session_state.search_data = data
+                response = requests.post(
+                    f"{API_URL}/match",
+                    json={
+                        "skills": candidate_skills,
+                        "role": job_role,
+                        "location": location,
+                        "experience": experience,
+                        "salary": salary
+                    },
+                    timeout=30
+                )
 
-                # Return to recommendations
-                # whenever a new search is performed.
+                if response.status_code == 200:
+
+                    st.session_state.search_data = (
+                        response.json()
+                    )
+
+                    st.session_state.show_all_jobs = False
+
+                    st.rerun()
+
+                else:
+
+                    try:
+                        error_detail = response.json().get(
+                            "detail",
+                            "Unknown API error"
+                        )
+                    except Exception:
+                        error_detail = response.text
+
+                    st.error(
+                        f"API error "
+                        f"{response.status_code}: "
+                        f"{error_detail}"
+                    )
+
+            except requests.exceptions.ConnectionError:
+
+                st.error(
+                    "Could not connect to FastAPI. "
+                    "Make sure the API is running on "
+                    "http://127.0.0.1:8000"
+                )
+
+            except requests.exceptions.Timeout:
+
+                st.error(
+                    "The request timed out. "
+                    "Please try again."
+                )
+
+            except Exception as e:
+
+                st.error(
+                    f"Something went wrong: {e}"
+                )
+
+
+    # ========================================================
+    # SEARCH RESULTS
+    # ========================================================
+
+    if st.session_state.search_data:
+
+        data = st.session_state.search_data
+
+        results = data.get(
+            "results",
+            []
+        )
+
+        all_results = data.get(
+            "all_results",
+            []
+        )
+
+        jobs_found = data.get(
+            "jobs_found",
+            0
+        )
+
+        jobs_analyzed = data.get(
+            "jobs_analyzed",
+            0
+        )
+
+
+        # ----------------------------------------------------
+        # SEARCH SUMMARY
+        # ----------------------------------------------------
+
+        st.divider()
+
+        recommended_count = len(results)
+
+        st.success(
+            f"{jobs_found} jobs found | "
+            f"{recommended_count} relevant jobs"
+        )
+
+
+        # ----------------------------------------------------
+        # RECOMMENDED JOBS
+        # ----------------------------------------------------
+
+        st.markdown("## Recommended Jobs")
+
+        st.caption(
+            "Top jobs ranked by your skill match."
+        )
+
+
+        # ----------------------------------------------------
+        # NO RECOMMENDATIONS
+        # ----------------------------------------------------
+
+        if not results:
+
+            st.info(
+                "No recommended jobs found."
+            )
+
+
+        # ----------------------------------------------------
+        # DISPLAY RECOMMENDATIONS
+        # ----------------------------------------------------
+
+        else:
+
+            for job in results:
+                with st.container(border=True):
+                    details_col, action_col = st.columns(
+                        [5, 1],
+                        vertical_alignment="center"
+                    )
+
+                    with details_col:
+                        st.markdown(
+                            f"### {job.get('title', 'Unknown Role')}"
+                        )
+
+                        st.write(
+                            f"**Company:** {job.get('company', 'Unknown')}"
+                        )
+
+                        st.write(
+                            f"**Location:** {job.get('location', 'Unknown')}"
+                        )
+
+                        st.write("Resume Match")
+                        st.markdown(
+                            f"## {job.get('match_score', 0)}%"
+                        )
+
+                        matched_skills = job.get("matched_skills", [])
+                        missing_skills = job.get("missing_skills", [])
+
+                        if matched_skills:
+                            st.write(
+                                "**Matched Skills:** "
+                                + ", ".join(matched_skills)
+                            )
+
+                        if missing_skills:
+                            st.write(
+                                "**Missing Skills:** "
+                                + ", ".join(missing_skills)
+                            )
+
+                    with action_col:
+                        job_url = get_job_url(job.get("job_id"))
+
+                        if not job_url:
+                            job_url = job.get("job_url")
+
+                        if job_url:
+                            st.link_button(
+                                "Apply Now",
+                                job_url,
+                                type="primary",
+                                use_container_width=True
+                            )
+                        else:
+                            st.caption("Application link unavailable")
+
+                st.markdown("")
+
+
+        # ----------------------------------------------------
+        # EXPLORE ALL JOBS
+        # ----------------------------------------------------
+
+        st.markdown(
+            "## 🔎 Explore All Matching Jobs"
+        )
+
+        st.write(
+            f"**{jobs_found} jobs** are available "
+            "for your selected filters."
+        )
+
+
+        # ----------------------------------------------------
+        # VIEW ALL BUTTON
+        # ----------------------------------------------------
+
+        if not st.session_state.show_all_jobs:
+
+            if st.button(
+                "VIEW ALL MATCHING JOBS"
+            ):
+
+                st.session_state.show_all_jobs = True
+
+                st.rerun()
+
+
+        # ----------------------------------------------------
+        # ALL JOBS
+        # ----------------------------------------------------
+
+        if st.session_state.show_all_jobs:
+
+            st.divider()
+
+            st.subheader(
+                f"All Matching Jobs "
+                f"({len(all_results)})"
+            )
+
+            st.caption(
+                "All jobs matching your selected "
+                "role and location filters."
+            )
+
+
+            if st.button(
+                "← BACK TO RECOMMENDED JOBS"
+            ):
 
                 st.session_state.show_all_jobs = False
 
                 st.rerun()
 
-            # --------------------------------------------------
-            # API ERROR
-            # --------------------------------------------------
-
-            else:
-
-                st.error(
-                    f"API error: "
-                    f"{response.status_code}"
-                )
-
-        # ------------------------------------------------------
-        # FASTAPI NOT RUNNING
-        # ------------------------------------------------------
-
-        except requests.exceptions.ConnectionError:
-
-            st.error(
-                "Could not connect to FastAPI. "
-                "Make sure the API is running."
-            )
-
-        # ------------------------------------------------------
-        # OTHER ERROR
-        # ------------------------------------------------------
-
-        except Exception as e:
-
-            st.error(
-                f"Something went wrong: {e}"
-            )
-
-
-# ==================================================
-# DISPLAY SEARCH RESULTS
-# ==================================================
-
-if st.session_state.search_data:
-
-    data = st.session_state.search_data
-
-    results = data.get(
-        "results",
-        []
-    )
-
-    all_results = data.get(
-        "all_results",
-        []
-    )
-
-    jobs_found = data.get(
-        "jobs_found",
-        0
-    )
-
-    jobs_analyzed = data.get(
-        "jobs_analyzed",
-        0
-    )
-
-    jobs_with_skill_data = data.get(
-        "jobs_with_skill_data",
-        jobs_analyzed
-    )
-
-
-    # ==================================================
-    # SEARCH SUMMARY
-    # ==================================================
-
-    recommended_count = len(data.get("results", []))
-
-    st.success(
-        f"{data['jobs_found']} jobs found | "
-        f"{recommended_count} relevant jobs"
-    )
-
-
-    # ==================================================
-    # RECOMMENDED JOBS
-    # ==================================================
-
-    st.divider()
-
-    st.subheader(
-        "Recommended Jobs"
-    )
-
-    st.caption(
-        "Top jobs ranked by your skill match."
-    )
-
-
-    # --------------------------------------------------
-    # NO RECOMMENDATIONS
-    # --------------------------------------------------
-
-    if not results:
-
-        st.info(
-            "No recommended jobs found."
-        )
-
-
-    # --------------------------------------------------
-    # DISPLAY RECOMMENDATIONS
-    # --------------------------------------------------
-
-    else:
-
-        for job in results:
-
-            st.markdown(
-                f"### {job['title']}"
-            )
-
-            st.write(
-                f"**Company:** "
-                f"{job['company']}"
-            )
-
-            st.write(
-                f"**Location:** "
-                f"{job['location']}"
-            )
-
-            # ----------------------------------------------
-            # MATCH SCORE
-            # ----------------------------------------------
-
-            st.metric(
-                "Match Score",
-                f"{job['match_score']}%"
-            )
-
-
-            # ----------------------------------------------
-            # MATCHED SKILLS
-            # ----------------------------------------------
-
-            if job["matched_skills"]:
-
-                st.write(
-                    "**Matched Skills:** "
-                    + ", ".join(
-                        job["matched_skills"]
-                    )
-                )
-
-
-            # ----------------------------------------------
-            # MISSING SKILLS
-            # ----------------------------------------------
-
-            if job["missing_skills"]:
-
-                st.write(
-                    "**Missing Skills:** "
-                    + ", ".join(
-                        job["missing_skills"]
-                    )
-                )
-
 
             st.divider()
 
 
-    # ==================================================
-    # EXPLORE ALL JOBS
-    # ==================================================
+            if not all_results:
 
-    st.markdown(
-        "## 🔎 Explore All Matching Jobs"
-    )
-
-    st.write(
-        f"**{jobs_found} jobs** are available "
-        "for your selected filters."
-    )
-
-
-    # ==================================================
-    # VIEW ALL BUTTON
-    # ==================================================
-
-    if not st.session_state.show_all_jobs:
-
-        if st.button(
-            "VIEW ALL MATCHING JOBS",
-            type="secondary"
-        ):
-
-            st.session_state.show_all_jobs = True
-
-            st.rerun()
-
-
-    # ==================================================
-    # ALL JOBS SECTION
-    # ==================================================
-
-    if st.session_state.show_all_jobs:
-
-        st.divider()
-
-        st.subheader(
-            f"All Matching Jobs ({len(all_results)})"
-        )
-
-        st.caption(
-            "These are all jobs matching your selected "
-            "role and location filters."
-        )
-
-
-        # --------------------------------------------------
-        # BACK BUTTON
-        # --------------------------------------------------
-
-        if st.button(
-            "← BACK TO RECOMMENDED JOBS"
-        ):
-
-            st.session_state.show_all_jobs = False
-
-            st.rerun()
-
-
-        st.divider()
-
-
-        # ==================================================
-        # DISPLAY ALL JOBS
-        # ==================================================
-
-        if not all_results:
-
-            st.info(
-                "No jobs found for the selected filters."
-            )
-
-        else:
-
-            for index, job in enumerate(
-                all_results,
-                start=1
-            ):
-
-                st.markdown(
-                    f"### {index}. {job['title']}"
+                st.info(
+                    "No jobs found for the selected filters."
                 )
 
-                st.write(
-                    f"**Company:** "
-                    f"{job['company']}"
-                )
+            else:
 
-                st.write(
-                    f"**Location:** "
-                    f"{job['location']}"
-                )
-
-
-                # --------------------------------------------------
-                # SKILL DATA AVAILABLE
-                # --------------------------------------------------
-
-                if job.get(
-                    "skill_data_available",
-                    False
+                for index, job in enumerate(
+                    all_results,
+                    start=1
                 ):
 
-                    st.metric(
-                        "Match Score",
-                        f"{job['match_score']}%"
+                    with st.container(border=True):
+                        details_col, action_col = st.columns(
+                            [5, 1],
+                            vertical_alignment="center"
+                        )
+
+                        with details_col:
+                            st.markdown(
+                                f"### {index}. {job.get('title', 'Unknown Role')}"
+                            )
+
+                            st.write(
+                                f"**Company:** {job.get('company', 'Unknown')}"
+                            )
+
+                            st.write(
+                                f"**Location:** {job.get('location', 'Unknown')}"
+                            )
+
+                            if job.get("skill_data_available", False):
+                                st.write("Resume Match")
+                                st.markdown(
+                                    f"## {job.get('match_score', 0)}%"
+                                )
+
+                                matched_skills = job.get("matched_skills", [])
+                                missing_skills = job.get("missing_skills", [])
+
+                                if matched_skills:
+                                    st.write(
+                                        "**Matched Skills:** "
+                                        + ", ".join(matched_skills)
+                                    )
+
+                                if missing_skills:
+                                    st.write(
+                                        "**Missing Skills:** "
+                                        + ", ".join(missing_skills)
+                                    )
+                            else:
+                                st.info(
+                                    "Skill data not available for this job."
+                                )
+
+                        with action_col:
+                            job_url = get_job_url(job.get("job_id"))
+
+                            if not job_url:
+                                job_url = job.get("job_url")
+
+                            if job_url:
+                                st.link_button(
+                                    "Apply Now",
+                                    job_url,
+                                    type="primary",
+                                    use_container_width=True
+                                )
+                            else:
+                                st.caption("Application link unavailable")
+
+                    st.markdown("")
+
+# ============================================================
+# RESUME ANALYSIS PAGE
+# ============================================================
+
+elif st.session_state.page == "Resume Analysis":
+
+    st.title("Resume Analysis")
+
+    st.markdown(
+        "Upload your resume to discover jobs that best match your skills."
+    )
+
+    st.divider()
+
+    st.subheader("Upload Your Resume")
+
+    uploaded_resume = st.file_uploader(
+        "Choose a PDF resume",
+        type=["pdf"],
+        help="Upload your latest resume in PDF format."
+    )
+
+    if uploaded_resume is not None:
+
+        st.success(
+            f"Resume uploaded: {uploaded_resume.name}"
+        )
+
+        if st.button("ANALYZE RESUME", type="primary"):
+
+            try:
+                with tempfile.NamedTemporaryFile(
+                    delete=False,
+                    suffix=".pdf"
+                ) as temp_file:
+                    temp_file.write(uploaded_resume.getvalue())
+                    resume_path = Path(temp_file.name)
+
+                resume_text = extract_text_from_pdf(resume_path)
+                resume_data = extract_resume_information(resume_text)
+                resume_skills = resume_data.get("skills", [])
+
+                if not resume_skills:
+                    st.session_state.resume_data = resume_data
+                    st.session_state.resume_jobs = None
+                    st.warning(
+                        "No supported skills were detected in the resume."
                     )
-
-
-                    if job["matched_skills"]:
-
-                        st.write(
-                            "**Matched Skills:** "
-                            + ", ".join(
-                                job["matched_skills"]
-                            )
-                        )
-
-
-                    if job["missing_skills"]:
-
-                        st.write(
-                            "**Missing Skills:** "
-                            + ", ".join(
-                                job["missing_skills"]
-                            )
-                        )
-
-
-                # --------------------------------------------------
-                # NO SKILL DATA
-                # --------------------------------------------------
 
                 else:
-
-                    st.info(
-                        "Skill data not available "
-                        "for this job."
+                    response = requests.post(
+                        f"{API_URL}/match",
+                        json={
+                            "skills": resume_skills,
+                            "role": "All Roles",
+                            "location": "All Locations",
+                            "experience": "Any Experience",
+                            "salary": "Any Salary"
+                        },
+                        timeout=60
                     )
 
+                    if response.status_code != 200:
+                        st.error(
+                            f"API error: {response.status_code}"
+                        )
+                    else:
+                        resume_job_data = response.json()
 
-                st.divider()
+                        st.session_state.resume_data = resume_data
+                        st.session_state.resume_jobs = resume_job_data.get(
+                            "all_results", []
+                        )
+
+                        # Reset UI filters whenever a new resume is analyzed.
+                        st.session_state.resume_filter_min_score = "50%+"
+                        st.session_state.resume_filter_location = "All Locations"
+                        st.session_state.resume_filter_sort = "Match Score ↓"
+
+                        st.rerun()
+
+            except Exception as e:
+                st.error(f"Resume analysis failed: {e}")
+
+    # ========================================================
+    # ANALYZED RESUME RESULTS
+    # ========================================================
+
+    if st.session_state.resume_jobs is not None:
+
+        all_resume_jobs = st.session_state.resume_jobs
+        resume_data = st.session_state.resume_data or {}
+        resume_skills = resume_data.get("skills", [])
+
+        # ----------------------------------------------------
+        # RESUME SKILLS
+        # ----------------------------------------------------
+
+        st.subheader("Skills Detected From Your Resume")
+        st.write(", ".join(resume_skills))
+        st.divider()
+
+        # ----------------------------------------------------
+        # RESUME MATCH INSIGHTS
+        # ----------------------------------------------------
+
+        st.subheader("Resume Match Insights")
+
+        match_summary = calculate_match_summary(all_resume_jobs)
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric(
+                "🟢 Strong Match",
+                match_summary["strong_match"],
+                "75%+"
+            )
+
+        with col2:
+            st.metric(
+                "🟡 Moderate Match",
+                match_summary["moderate_match"],
+                "50–74%"
+            )
+
+        with col3:
+            st.metric(
+                "🔴 Low Match",
+                match_summary["low_match"],
+                "<50%"
+            )
+
+        st.divider()
+
+        # ----------------------------------------------------
+        # TOP MISSING SKILLS
+        # ----------------------------------------------------
+
+        top_missing_skills = get_top_missing_skills(
+            all_resume_jobs,
+            top_n=5
+        )
+
+        if top_missing_skills:
+            with st.container(border=True):
+                st.subheader("📌 Top Missing Skills")
+                st.caption(
+                    "Skills frequently requested by relevant jobs "
+                    "that are not detected in your resume."
+                )
+
+                for index, item in enumerate(top_missing_skills, start=1):
+                    st.markdown(
+                        f"**{index}. {item['skill']}** — requested by "
+                        f"{item['job_count']} relevant jobs"
+                    )
+
+        st.divider()
+
+        # ----------------------------------------------------
+        # JOB FILTERS
+        # ----------------------------------------------------
+
+        st.subheader("💼 Jobs Based on Your Resume")
+        st.caption("Filter and sort jobs using your resume match score.")
+
+        filter_col1, filter_col2, filter_col3 = st.columns(3)
+
+        with filter_col1:
+            min_score_label = st.selectbox(
+                "Minimum Match Score",
+                ["50%+", "60%+", "70%+", "80%+", "90%+"],
+                key="resume_filter_min_score"
+            )
+
+        with filter_col2:
+            # Build locations from the actual analyzed jobs.
+            location_values = []
+            for job in all_resume_jobs:
+                value = str(job.get("location", "")).strip()
+                if value and value not in location_values:
+                    location_values.append(value)
+
+            location_options = ["All Locations"] + sorted(location_values)
+
+            current_location = st.session_state.resume_filter_location
+            if current_location not in location_options:
+                st.session_state.resume_filter_location = "All Locations"
+
+            selected_location = st.selectbox(
+                "Location",
+                location_options,
+                key="resume_filter_location"
+            )
+
+        with filter_col3:
+            sort_option = st.selectbox(
+                "Sort By",
+                ["Match Score ↓", "Match Score ↑", "Job Title A–Z"],
+                key="resume_filter_sort"
+            )
+
+        # ----------------------------------------------------
+        # APPLY FILTERS DIRECTLY
+        # ----------------------------------------------------
+
+        min_score = int(min_score_label.replace("%+", ""))
+
+        filtered_resume_jobs = []
+
+        for job in all_resume_jobs:
+            try:
+                score = float(job.get("match_score", 0) or 0)
+            except (TypeError, ValueError):
+                score = 0
+
+            if score < min_score:
+                continue
+
+            if selected_location != "All Locations":
+                job_location = str(job.get("location", "")).strip()
+                if job_location != selected_location:
+                    continue
+
+            filtered_resume_jobs.append(job)
+
+        if sort_option == "Match Score ↓":
+            filtered_resume_jobs.sort(
+                key=lambda job: float(job.get("match_score", 0) or 0),
+                reverse=True
+            )
+        elif sort_option == "Match Score ↑":
+            filtered_resume_jobs.sort(
+                key=lambda job: float(job.get("match_score", 0) or 0)
+            )
+        else:
+            filtered_resume_jobs.sort(
+                key=lambda job: str(job.get("title", "")).lower()
+            )
+
+        st.success(f"{len(filtered_resume_jobs)} jobs found")
+
+        # ----------------------------------------------------
+        # FILTERED JOB CARDS
+        # ----------------------------------------------------
+
+        if not filtered_resume_jobs:
+            st.info("No jobs match the selected filters.")
+
+        else:
+            for job in filtered_resume_jobs:
+                with st.container(border=True):
+                    details_col, action_col = st.columns(
+                        [5, 1],
+                        vertical_alignment="center"
+                    )
+
+                    with details_col:
+                        st.markdown(
+                            f"### {job.get('title', 'Unknown Role')}"
+                        )
+
+                        st.write(
+                            f"**Company:** {job.get('company', 'Unknown')}"
+                        )
+
+                        st.write(
+                            f"**Location:** {job.get('location', 'Unknown')}"
+                        )
+
+                        st.write("Resume Match")
+                        st.markdown(
+                            f"## {job.get('match_score', 0)}%"
+                        )
+
+                        matched_skills = job.get("matched_skills", [])
+                        missing_skills = job.get("missing_skills", [])
+
+                        if matched_skills:
+                            st.write(
+                                "**Matched Skills:** "
+                                + ", ".join(matched_skills)
+                            )
+
+                        if missing_skills:
+                            st.write(
+                                "**Skills to Develop:** "
+                                + ", ".join(missing_skills)
+                            )
+
+                    with action_col:
+                        job_url = get_job_url(job.get("job_id"))
+
+                        if job_url:
+                            st.link_button(
+                                "Apply Now",
+                                job_url,
+                                type="primary",
+                                use_container_width=True
+                            )
+                        else:
+                            st.caption("Application link unavailable")
+
+                st.markdown("")
+
+# ============================================================
+# ANALYTICS PAGE
+# ============================================================
+
+elif st.session_state.page == "Analytics":
+
+    st.title("📊 Job Market Analytics")
+
+    st.markdown(
+        "Explore insights from the jobs returned by your "
+        "current job search."
+    )
+
+    st.divider()
+
+    # --------------------------------------------------------
+    # GET AVAILABLE JOB DATA
+    # --------------------------------------------------------
+
+    analytics_jobs = []
+
+    if st.session_state.search_data:
+        analytics_jobs = st.session_state.search_data.get(
+            "all_results",
+            []
+        )
+
+    # --------------------------------------------------------
+    # NO DATA
+    # --------------------------------------------------------
+
+    if not analytics_jobs:
+        st.info("No job data is available yet.")
+        st.markdown(
+            "Go to **Job Search**, perform a search, "
+            "and then return here to view analytics."
+        )
+
+    else:
+
+        # ----------------------------------------------------
+        # ANALYTICS CALCULATIONS
+        # ----------------------------------------------------
+
+        total_jobs = get_total_jobs(analytics_jobs)
+
+        average_match = get_average_match_score(analytics_jobs)
+
+        locations = get_jobs_by_location(analytics_jobs)
+
+        roles = get_jobs_by_role(analytics_jobs)
+
+        top_skills = get_top_skills(
+            analytics_jobs,
+            top_n=10
+        )
+
+        match_distribution = get_match_score_distribution(
+            analytics_jobs
+        )
+
+        # ----------------------------------------------------
+        # KPI CARDS
+        # ----------------------------------------------------
+
+        st.subheader("Job Market Overview")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            st.metric(
+                "Total Jobs",
+                total_jobs
+            )
+
+        with col2:
+            st.metric(
+                "Average Match Score",
+                f"{average_match:.0f}%"
+            )
+
+        with col3:
+            st.metric(
+                "Locations",
+                len(locations)
+            )
+
+        st.markdown("")
+
+        # ----------------------------------------------------
+        # JOBS BY ROLE + LOCATION
+        # ----------------------------------------------------
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("💼 Jobs by Role")
+
+            if roles:
+                st.bar_chart(roles)
+            else:
+                st.info("No role data available.")
+
+        with col2:
+            st.subheader("📍 Jobs by Location")
+
+            if locations:
+                st.bar_chart(locations)
+            else:
+                st.info("No location data available.")
+
+        st.divider()
+
+        # ----------------------------------------------------
+        # TOP SKILLS
+        # ----------------------------------------------------
+
+        st.subheader("🔥 Most Demanded Skills")
+
+        if top_skills:
+            skill_data = {
+                skill.title(): count
+                for skill, count in top_skills
+            }
+
+            st.bar_chart(skill_data)
+        else:
+            st.info("Skill data is not available for these jobs.")
+
+        st.divider()
+
+        # ----------------------------------------------------
+        # MATCH SCORE DISTRIBUTION
+        # ----------------------------------------------------
+
+        st.subheader("🎯 Resume Match Score Distribution")
+
+        st.bar_chart(match_distribution)
+
+        st.divider()
+
+        # ----------------------------------------------------
+        # ANALYTICS NOTE
+        # ----------------------------------------------------
+
+        st.caption(
+            "Analytics are calculated from the jobs returned "
+            "by your current search. Jobs without skill data "
+            "are excluded from match-score calculations."
+        )
+
+# ============================================================
+# APP FOOTER
+# ============================================================
+
+st.markdown(
+    """
+    <div style="
+        margin-top: 60px;
+        padding: 22px 10px 12px 10px;
+        border-top: 1px solid rgba(128, 128, 128, 0.25);
+        text-align: center;
+        opacity: 0.65;
+        font-size: 13px;
+    ">
+        <div style="font-weight: 600; margin-bottom: 5px;">
+            📊 AI Job Market Analytics
+        </div>
+        <div>
+            AI-Powered Job Market Analytics Platform &nbsp;•&nbsp; Built for smarter career decisions
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
