@@ -1,3 +1,4 @@
+import re
 import sys
 from pathlib import Path
 
@@ -393,38 +394,167 @@ with st.sidebar:
 
 if st.session_state.page == "Home":
 
+    
+    # --------------------------------------------------------
     # --------------------------------------------------------
     # WELCOME SECTION
     # --------------------------------------------------------
 
-    st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap');
-
-    .joblens-name {
-        font-family: 'Poppins', sans-serif;
-        font-weight: 700;
-        color: #5A5D66;
-    }
-
-    .joblens-ai {
-        font-family: 'Poppins', sans-serif;
-        font-weight: 700;
-        color: #168FE5;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+    # --------------------------------------------------------
+    # CUSTOM CSS
+    # --------------------------------------------------------
 
     st.markdown(
         """
-        <h1>
+        <style>
+
+        /* ==================================================
+        JOBLENS HEADING
+        ================================================== */
+
+        .joblens-welcome {
+            font-family: 'Poppins', sans-serif;
+            font-size: 52px;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-top: 5px;
+            margin-bottom: 25px;
+        }
+
+        .joblens-name {
+            color: #5A5D66;
+        }
+
+        .joblens-ai {
+            color: #168FE5;
+        }
+
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+    # --------------------------------------------------------
+    # INDIA JOB MARKET MOVING BANNER
+    # --------------------------------------------------------
+
+    st.html(
+        """
+        <style>
+
+            .india-banner {
+                width: 100%;
+                height: 42px;
+                overflow: hidden;
+                position: relative;
+
+                margin-bottom: 25px;
+
+                border-radius: 10px;
+
+                background: linear-gradient(
+                    90deg,
+                    #F8FAFC,
+                    #EEF6FF,
+                    #F8FAFC
+                );
+
+                border: 1px solid #D8E3F0;
+
+                display: flex;
+                align-items: center;
+
+                box-sizing: border-box;
+            }
+
+
+            .india-banner-text {
+                position: absolute;
+
+                white-space: nowrap;
+
+                font-family: 'Poppins', sans-serif;
+
+                font-size: 13px;
+                font-weight: 500;
+
+                color: #4B5563;
+
+                left: 0;
+
+                animation: india-scroll 16s linear infinite;
+            }
+
+
+            .india-banner-title {
+                color: #1677C8;
+
+                font-weight: 700;
+
+                letter-spacing: 0.6px;
+            }
+
+
+            .india-banner-separator {
+                color: #168FE5;
+
+                font-weight: 700;
+
+                margin-left: 12px;
+                margin-right: 12px;
+            }
+
+
+            @keyframes india-scroll {
+
+                0% {
+                    transform: translateX(-100%);
+                }
+
+                100% {
+                    transform: translateX(100vw);
+                }
+
+            }
+
+        </style>
+
+
+        <div class="india-banner">
+
+            <div class="india-banner-text">
+
+                <span class="india-banner-title">
+                    INDIA JOB MARKET
+                </span>
+
+                <span class="india-banner-separator">
+                    |
+                </span>
+
+                <span>
+                    Currently displaying job opportunities across India
+                </span>
+
+            </div>
+
+        </div>
+        """
+    )
+
+
+    # --------------------------------------------------------
+    # WELCOME HEADING
+    # --------------------------------------------------------
+
+    st.markdown(
+        """
+        <div class="joblens-welcome">
             Welcome to
-            <span class="joblens-name">JobLens</span>
-            <span class="joblens-ai">AI</span>
-        </h1>
+            <span class="joblens-name"> JobLens</span>
+            <span class="joblens-ai"> AI</span>
+        </div>
         """,
         unsafe_allow_html=True
     )
@@ -1133,7 +1263,7 @@ elif st.session_state.page == "Resume Analysis":
 
         if top_missing_skills:
             with st.container(border=True):
-                st.subheader("📌 Top Missing Skills")
+                st.subheader("Top Missing Skills")
                 st.caption(
                     "Skills frequently requested by relevant jobs "
                     "that are not detected in your resume."
@@ -1151,7 +1281,7 @@ elif st.session_state.page == "Resume Analysis":
         # JOB FILTERS
         # ----------------------------------------------------
 
-        st.subheader("💼 Jobs Based on Your Resume")
+        st.subheader("Jobs Based on Your Resume")
         st.caption("Filter and sort jobs using your resume match score.")
 
         filter_col1, filter_col2, filter_col3 = st.columns(3)
@@ -1495,6 +1625,8 @@ elif st.session_state.page == "Analytics":
             "by your current search. Jobs without skill data "
             "are excluded from match-score calculations."
         )
+
+
 
 # ============================================================
 # PRIVACY POLICY PAGE
